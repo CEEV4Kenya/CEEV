@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CEEV — Citizen E-Participation in Electoral Verification</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --kg: #006B3C; --kr: #BB0000; --gold: #C8972A;
+    --cream: #F5F0E8; --bg: #09100E; --bg2: #0D1A10;
+    --border: rgba(0,107,60,0.18); --muted: rgba(245,240,232,0.45);
+    --faint: rgba(245,240,232,0.22);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--cream);
+    font-family: 'Source Serif 4', Georgia, serif;
+    min-height: 100vh; overflow-x: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(ellipse at 10% 10%, rgba(0,107,60,0.08) 0%, transparent 55%),
+      radial-gradient(ellipse at 90% 90%, rgba(187,0,0,0.05) 0%, transparent 55%);
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: sticky; top: 0; z-index: 200;
+    background: rgba(9,16,14,0.96); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 1.4rem; height: 54px;
+  }
+  .nav-brand { display: flex; align-items: center; gap: 0.75rem; }
+  .flag-stripe { display: flex; flex-direction: column; width: 5px; height: 26px; border-radius: 2px; overflow: hidden; }
+  .flag-stripe span:nth-child(1) { flex: 1; background: var(--kr); }
+  .flag-stripe span:nth-child(2) { flex: 1; background: #111; }
+  .flag-stripe span:nth-child(3) { flex: 1; background: var(--kg); }
+  .brand-text { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--cream); letter-spacing: -0.01em; }
+  .nav-links { display: flex; gap: 1.2rem; align-items: center; }
+  .nav-btn {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--muted); font-family: 'Source Serif 4', serif;
+    font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
+    cursor: pointer; padding-bottom: 3px; transition: all 0.15s;
+  }
+  .nav-btn.active { color: var(--kg); border-bottom-color: var(--kg); }
+  .live-dot {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--faint); transition: color 0.3s;
+  }
+  .live-dot .dot { width: 6px; height: 6px; border-radius: 50%; background: #4B5563; transition: background 0.3s; }
+  .live-dot.pulse { color: var(--kg); }
+  .live-dot.pulse .dot { background: var(--kg); box-shadow: 0 0 6px var(--kg); }
+
+  /* ── PAGES ── */
+  .page { display: none; position: relative; z-index: 1; animation: fadeUp 0.3s ease; }
+  .page.active { display: block; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .container { max-width: 1060px; margin: 0 auto; padding: 2.5rem 1.4rem 5rem; }
+  .container-sm { max-width: 640px; margin: 0 auto; padding: 2.5rem 1.4rem 5rem; }
+
+  /* ── TYPOGRAPHY ── */
+  h1 { font-family: 'Playfair Display', serif; font-size: clamp(2rem, 5vw, 3.2rem); color: var(--cream); line-height: 1.12; letter-spacing: -0.03em; margin-bottom: 1.1rem; }
+  h2 { font-family: 'Playfair Display', serif; font-size: clamp(1.5rem, 3vw, 2rem); color: var(--cream); letter-spacing: -0.02em; margin-bottom: 0.5rem; }
+  h3 { font-family: 'Playfair Display', serif; font-size: 1rem; color: var(--cream); margin-bottom: 0.5rem; }
+  .accent { color: var(--kg); }
+  .label { font-size: 0.64rem; color: var(--gold); text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 0.7rem; }
+  .muted { color: var(--muted); }
+  .mono { font-family: 'Courier New', monospace; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.4rem;
+  }
+  .card + .card { margin-top: 1rem; }
+
+  /* ── BADGES ── */
+  .badge {
+    display: inline-block; font-size: 0.64rem; padding: 0.15rem 0.5rem;
+    border-radius: 3px; text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .badge-green { background: rgba(0,107,60,0.2); color: #4ADE80; border: 1px solid rgba(0,107,60,0.35); }
+  .badge-amber { background: rgba(200,151,42,0.15); color: #FCD34D; border: 1px solid rgba(200,151,42,0.3); }
+  .badge-red { background: rgba(187,0,0,0.15); color: #FCA5A5; border: 1px solid rgba(187,0,0,0.25); }
+  .badge-blue { background: rgba(59,130,246,0.15); color: #93C5FD; border: 1px solid rgba(59,130,246,0.25); }
+  .badge-gray { background: rgba(107,114,128,0.15); color: #9CA3AF; border: 1px solid rgba(107,114,128,0.2); }
+
+  /* ── BUTTONS ── */
+  .btn-primary {
+    display: inline-block; padding: 0.75rem 2rem; background: var(--kg);
+    color: var(--cream); border: none; border-radius: 6px;
+    font-family: 'Playfair Display', serif; font-weight: 600; font-size: 0.9rem;
+    cursor: pointer; letter-spacing: 0.02em; transition: opacity 0.15s; text-decoration: none;
+  }
+  .btn-outline {
+    display: inline-block; padding: 0.75rem 2rem; background: transparent;
+    color: var(--cream); border: 1px solid var(--border); border-radius: 6px;
+    font-family: 'Source Serif 4', serif; font-size: 0.9rem;
+    cursor: pointer; transition: opacity 0.15s; text-decoration: none;
+  }
+  .btn-primary:hover, .btn-outline:hover { opacity: 0.82; }
+  .btn-wa {
+    display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+    padding: 0.9rem; background: #25D366; color: #fff; border: none;
+    border-radius: 8px; font-family: 'Playfair Display', serif;
+    font-weight: 600; font-size: 0.9rem; cursor: pointer; text-decoration: none;
+    transition: opacity 0.15s; width: 100%;
+  }
+  .btn-wa:hover { opacity: 0.88; }
+
+  /* ── FORMS ── */
+  .field-label { font-size: 0.68rem; color: var(--gold); text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 6px; }
+  .field {
+    width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0.6rem 0.9rem; color: var(--cream);
+    font-family: 'Source Serif 4', serif; font-size: 0.88rem; outline: none;
+    transition: border-color 0.15s;
+  }
+  .field:focus { border-color: var(--kg); }
+  .field option { background: #0D1A10; }
+
+  /* ── GRID LAYOUTS ── */
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem; }
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+  .grid-dash { display: grid; grid-template-columns: 2fr 1fr; gap: 1.2rem; }
+  @media (max-width: 720px) {
+    .grid-dash { grid-template-columns: 1fr; }
+    .nav-links .nav-btn:nth-child(n+4) { display: none; }
+  }
+
+  /* ── POSITION TABS ── */
+  .pos-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .pos-tab {
+    padding: 0.38rem 0.95rem; border-radius: 20px; font-size: 0.75rem;
+    font-family: 'Source Serif 4', serif; cursor: pointer; letter-spacing: 0.04em;
+    background: transparent; color: var(--muted); border: 1px solid var(--border);
+    transition: all 0.15s;
+  }
+  .pos-tab.active { background: var(--kg); color: var(--cream); border-color: var(--kg); }
+
+  /* ── CHART AREA ── */
+  .chart-wrap { position: relative; height: 260px; margin: 0.5rem 0 1rem; }
+
+  /* ── FEED ── */
+  .feed-row {
+    display: grid; grid-template-columns: 90px 1fr auto auto;
+    gap: 0.6rem; align-items: center; padding: 0.45rem 0.6rem;
+    border-radius: 5px; transition: background 0.5s; font-size: 0.78rem;
+  }
+  .feed-row.new { background: rgba(0,107,60,0.1); }
+
+  /* ── STATIONS TABLE ── */
+  .stations-table { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .st-head, .st-row {
+    display: grid;
+    grid-template-columns: 88px 1fr 90px 110px 64px 70px 100px;
+    padding: 0.65rem 1.1rem; align-items: center;
+  }
+  .st-head { border-bottom: 1px solid var(--border); font-size: 0.62rem; color: var(--gold); text-transform: uppercase; letter-spacing: 0.1em; }
+  .st-row { border-bottom: 1px solid rgba(0,107,60,0.08); font-size: 0.8rem; }
+  .st-row:last-child { border-bottom: none; }
+  .st-row:nth-child(even) { background: rgba(255,255,255,0.01); }
+
+  /* ── ALERT ── */
+  .alert-div {
+    margin-top: 1rem; padding: 0.75rem 1rem;
+    background: rgba(187,0,0,0.09); border: 1px solid rgba(187,0,0,0.3);
+    border-radius: 6px; font-size: 0.78rem; color: #FCA5A5;
+  }
+  .alert-green {
+    margin-top: 1rem; padding: 0.75rem 1rem;
+    background: rgba(0,107,60,0.12); border: 1px solid rgba(0,107,60,0.35);
+    border-radius: 6px; font-size: 0.82rem; color: #6EE7B7;
+  }
+
+  /* ── SUCCESS BOX ── */
+  .success-box {
+    background: rgba(0,107,60,0.1); border: 1px solid rgba(0,107,60,0.35);
+    border-radius: 12px; padding: 2.5rem; text-align: center; max-width: 480px; margin: 0 auto;
+  }
+  .ref-code {
+    font-family: 'Courier New', monospace; font-size: 1.6rem; color: var(--kg);
+    background: rgba(0,107,60,0.15); border-radius: 8px; padding: 0.8rem 1.5rem;
+    letter-spacing: 0.1em; margin: 1rem 0;
+  }
+
+  /* ── VERIFY RECORD ── */
+  .verify-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.55rem 0; border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+  }
+  .verify-row span:first-child { color: var(--muted); font-size: 0.75rem; }
+
+  /* ── STAT CARDS ── */
+  .stat-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.1rem; text-align: center;
+  }
+  .stat-num { font-family: 'Playfair Display', serif; font-size: 1.8rem; color: var(--kg); }
+  .stat-lbl { font-size: 0.65rem; color: var(--faint); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,107,60,0.3); border-radius: 3px; }
+  input::placeholder, textarea::placeholder { color: rgba(245,240,232,0.2); }
+</style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══════════════════════════════════════════════ -->
+<nav>
+  <div class="nav-brand">
+    <div class="flag-stripe"><span></span><span></span><span></span></div>
+    <span class="brand-text">CEEV</span>
+  </div>
+  <div class="nav-links">
+    <button class="nav-btn active" onclick="goto('home')">Home</button>
+    <button class="nav-btn" onclick="goto('submit')">Submit</button>
+    <button class="nav-btn" onclick="goto('dashboard')">Dashboard</button>
+    <button class="nav-btn" onclick="goto('stations')">Stations</button>
+    <button class="nav-btn" onclick="goto('verify')">Verify</button>
+  </div>
+  <div class="live-dot" id="liveDot">
+    <span class="dot"></span> Live
+  </div>
+</nav>
+
+<!-- ═══ HOME ══════════════════════════════════════════════ -->
+<section class="page active" id="page-home">
+<div class="container">
+  <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(0,107,60,0.12);border:1px solid var(--border);border-radius:20px;padding:0.3rem 0.9rem;font-size:0.68rem;color:var(--kg);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:1.8rem;">
+    🗳 Mozilla Democracy × AI Incubator · Kenya 2027
+  </div>
+  <h1>Citizen E-Participation<br>in <span class="accent">Electoral Verification</span></h1>
+  <p style="font-size:1rem;color:var(--muted);line-height:1.8;max-width:620px;margin-bottom:2rem;">
+    CEEV enables citizens to verify electoral results in real time — photograph your ballot, submit via WhatsApp, and watch a citizen-driven tally (DEW Tally) build alongside the official IEBC count.
+  </p>
+  <div style="border-left:3px solid var(--kg);padding-left:1.3rem;margin-bottom:2.8rem;max-width:580px;">
+    <div class="label">Research Foundation</div>
+    <p style="font-size:0.85rem;color:var(--muted);line-height:1.7;font-style:italic;">
+      "Limited research addresses how citizen e-participation architectures can be designed to strengthen verification, transparency, and trust in fragile electoral processes." — CEEV Research Abstract, 2025
+    </p>
+  </div>
+
+  <!-- How it works -->
+  <div class="label" style="margin-bottom:1.2rem;">How It Works</div>
+  <div class="grid-3" style="margin-bottom:2.8rem;">
+    <div class="card"><div style="font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--kg);font-weight:700;margin-bottom:8px;">01</div><h3>Vote & Photograph</h3><p style="font-size:0.78rem;color:var(--muted);line-height:1.6;">After voting, photograph your completed ballot showing all 6 positions clearly.</p></div>
+    <div class="card"><div style="font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--kg);font-weight:700;margin-bottom:8px;">02</div><h3>Send via WhatsApp</h3><p style="font-size:0.78rem;color:var(--muted);line-height:1.6;">Send the photo to <strong style="color:var(--cream);">+254 114 748 864</strong>. Include your polling station name.</p></div>
+    <div class="card"><div style="font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--kg);font-weight:700;margin-bottom:8px;">03</div><h3>AI Extraction</h3><p style="font-size:0.78rem;color:var(--muted);line-height:1.6;">Our AI reads your vote data, generates a unique CEV reference code, and sends you a receipt.</p></div>
+    <div class="card"><div style="font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--kg);font-weight:700;margin-bottom:8px;">04</div><h3>Verify & Confirm</h3><p style="font-size:0.78rem;color:var(--muted);line-height:1.6;">Log in with your reference code to confirm your submission is correctly recorded.</p></div>
+    <div class="card"><div style="font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--kg);font-weight:700;margin-bottom:8px;">05</div><h3>Watch Dashboard</h3><p style="font-size:0.78rem;color:var(--muted);line-height:1.6;">Compare the DEW citizen tally with IEBC official announcements live.</p></div>
+    <div class="card"><div style="font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--kg);font-weight:700;margin-bottom:8px;">06</div><h3>Flag Discrepancies</h3><p style="font-size:0.78rem;color:var(--muted);line-height:1.6;">If tallies diverge beyond the margin, CEEV alerts observers to investigate.</p></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid-3" style="margin-bottom:2.5rem;">
+    <div class="stat-card"><div class="stat-num" id="homeTotalSubs">567</div><div class="stat-lbl">Citizen Submissions</div></div>
+    <div class="stat-card"><div class="stat-num">9/14</div><div class="stat-lbl">Stations Reporting</div></div>
+    <div class="stat-card"><div class="stat-num">6</div><div class="stat-lbl">Elective Positions</div></div>
+    <div class="stat-card"><div class="stat-num">47</div><div class="stat-lbl">Counties Covered</div></div>
+    <div class="stat-card"><div class="stat-num">~46K</div><div class="stat-lbl">Total Kenya Stations</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--gold);">PILOT</div><div class="stat-lbl">Phase Status</div></div>
+  </div>
+
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+    <button class="btn-primary" onclick="goto('submit')">Submit Your Vote →</button>
+    <button class="btn-outline" onclick="goto('dashboard')">View Live Dashboard</button>
+  </div>
+</div>
+</section>
+
+<!-- ═══ SUBMIT ═════════════════════════════════════════════ -->
+<section class="page" id="page-submit">
+<div class="container">
+  <h2>Submit Your Vote</h2>
+  <p class="muted" style="margin-bottom:2rem;font-size:0.9rem;">Your submission strengthens electoral transparency. Your identity is protected.</p>
+
+  <div id="submitForm">
+    <div class="grid-2">
+      <!-- WhatsApp -->
+      <div class="card" style="display:flex;flex-direction:column;">
+        <div class="label">Recommended — Via WhatsApp</div>
+        <div style="width:52px;height:52px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin-bottom:1rem;">💬</div>
+        <h3 style="margin-bottom:0.6rem;">Send Ballot Photo</h3>
+        <ol style="font-size:0.82rem;color:var(--muted);line-height:1.8;padding-left:1.2rem;margin-bottom:auto;padding-bottom:1.2rem;">
+          <li>Take a clear photo of your completed ballot</li>
+          <li>Open WhatsApp and message our verification line</li>
+          <li>Include your polling station name in the message</li>
+          <li>Receive your reference code by reply within minutes</li>
+        </ol>
+        <a href="https://wa.me/25411748864?text=CEEV%20Submission%20-%20Polling%20Station%3A%20" target="_blank" class="btn-wa">
+          <span>💬</span> Open WhatsApp → +254 114 748 864
+        </a>
+      </div>
+
+      <!-- Web form -->
+      <div class="card">
+        <div class="label">Alternative — Web Form</div>
+        <div style="display:flex;flex-direction:column;gap:0.9rem;">
+          <div>
+            <label class="field-label">Polling Station</label>
+            <select class="field" id="fs-station">
+              <option value="">— Select your station —</option>
+              <option value="NRB-001">NRB-001 — Kibera Primary School</option>
+              <option value="NRB-002">NRB-002 — St. Francis Secondary</option>
+              <option value="NRB-003">NRB-003 — Pumwani Community Centre</option>
+              <option value="NRB-004">NRB-004 — Karen Social Hall</option>
+              <option value="NRB-005">NRB-005 — Mathare Youth Centre</option>
+              <option value="MSA-001">MSA-001 — Mvita Primary School</option>
+              <option value="MSA-002">MSA-002 — Tudor Community Hall</option>
+              <option value="KSM-001">KSM-001 — Kondele Primary School</option>
+              <option value="KSM-002">KSM-002 — Nyalenda Community Centre</option>
+              <option value="NAK-001">NAK-001 — Nakuru Township Primary</option>
+              <option value="ELD-001">ELD-001 — Eldoret North Primary</option>
+              <option value="KKM-001">KKM-001 — Kakamega Town Hall</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Position</label>
+            <select class="field" id="fs-position" onchange="updateCandidates()">
+              <option value="President">President</option>
+              <option value="Governor">Governor</option>
+              <option value="Senator">Senator</option>
+              <option value="MP">Member of Parliament</option>
+              <option value="Women Rep">Women Representative</option>
+              <option value="MCA">Member of County Assembly</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Candidate Voted For</label>
+            <select class="field" id="fs-candidate"></select>
+          </div>
+          <div>
+            <label class="field-label">Your Phone (for receipt)</label>
+            <input class="field" type="tel" id="fs-phone" placeholder="+254 7XX XXX XXX"/>
+          </div>
+          <button class="btn-primary" style="width:100%;" onclick="handleSubmit()">Submit & Get Reference Code</button>
+          <p style="font-size:0.7rem;color:var(--faint);text-align:center;">Your phone is only used to send your receipt. Never shared.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="submitSuccess" style="display:none;">
+    <div class="success-box">
+      <div style="font-size:2.8rem;margin-bottom:1rem;">✅</div>
+      <h3 style="font-size:1.3rem;margin-bottom:0.8rem;">Submission Received</h3>
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;">Your reference code:</p>
+      <div class="ref-code" id="refCodeDisplay">CEV-0000</div>
+      <p style="font-size:0.78rem;color:var(--muted);line-height:1.7;margin-bottom:1.5rem;">
+        Save this code. Use it in the <strong>Verify</strong> tab to confirm your submission is correctly recorded in the citizen DEW tally.
+      </p>
+      <div style="display:flex;gap:0.8rem;justify-content:center;flex-wrap:wrap;">
+        <button class="btn-outline" onclick="resetSubmit()">Submit Another</button>
+        <button class="btn-primary" onclick="goto('verify')">Verify Now →</button>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ═══ DASHBOARD ══════════════════════════════════════════ -->
+<section class="page" id="page-dashboard">
+<div class="container">
+  <!-- Header row -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.6rem;">
+    <div>
+      <div style="font-size:0.66rem;color:var(--gold);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:4px;display:flex;align-items:center;gap:6px;">
+        <span id="dashLiveDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#4B5563;"></span>
+        Live Feed · Kenya General Election 2027
+      </div>
+      <h2 style="margin-bottom:0.2rem;">Citizen Tally vs IEBC Official Count</h2>
+      <p style="font-size:0.8rem;color:var(--muted);">
+        <span style="display:inline-block;width:10px;height:10px;background:var(--kg);border-radius:2px;margin-right:4px;vertical-align:middle;"></span>DEW Tally (Citizen-submitted) &nbsp;&nbsp;
+        <span style="display:inline-block;width:10px;height:10px;background:rgba(245,240,232,0.2);border-radius:2px;margin-right:4px;vertical-align:middle;"></span>IEBC Tally (Official)
+      </p>
+    </div>
+    <div style="display:flex;gap:1rem;align-items:center;">
+      <div class="card" style="padding:0.8rem 1.2rem;text-align:center;min-width:90px;">
+        <div id="dashTotal" class="stat-num" style="font-size:1.4rem;transition:color 0.3s;">567</div>
+        <div class="stat-lbl" style="font-size:0.6rem;">DEW Submissions</div>
+      </div>
+      <div class="card" style="padding:0.8rem 1.2rem;text-align:center;min-width:80px;">
+        <div id="dashDiverg" class="stat-num" style="font-size:1.4rem;">3%</div>
+        <div class="stat-lbl" style="font-size:0.6rem;">Divergence</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Position tabs -->
+  <div class="pos-tabs" id="posTabs"></div>
+
+  <!-- Main grid -->
+  <div class="grid-dash">
+    <!-- Chart + table -->
+    <div>
+      <div class="card">
+        <div class="label" id="chartTitle">President — DEW Tally vs IEBC Tally</div>
+        <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+        <div id="candidateRows" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.8rem;"></div>
+        <div id="divergAlert" style="display:none;" class="alert-div"></div>
+      </div>
+    </div>
+
+    <!-- Side column -->
+    <div style="display:flex;flex-direction:column;gap:1.2rem;">
+      <!-- Mini pie -->
+      <div class="card">
+        <div class="label">DEW Vote Share</div>
+        <div style="position:relative;height:160px;"><canvas id="pieChart"></canvas></div>
+        <div id="pieLabels" style="margin-top:0.8rem;display:flex;flex-direction:column;gap:0.4rem;"></div>
+      </div>
+
+      <!-- Live feed -->
+      <div class="card">
+        <div class="label">Live DEW Submissions Feed</div>
+        <div id="feedList" style="display:flex;flex-direction:column;gap:0.4rem;max-height:230px;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ═══ STATIONS ═══════════════════════════════════════════ -->
+<section class="page" id="page-stations">
+<div class="container">
+  <h2>All Polling Stations</h2>
+  <p class="muted" style="font-size:0.88rem;margin-bottom:0.8rem;">9 of 14 pilot stations reporting. Production deployment will connect all 46,229 IEBC-registered stations via live database API.</p>
+  <div style="padding:0.7rem 1rem;background:rgba(200,151,42,0.08);border:1px solid rgba(200,151,42,0.25);border-radius:6px;font-size:0.78rem;color:#FCD34D;margin-bottom:1.5rem;">
+    ⚠ <strong>Pilot Mode:</strong> Currently covering 14 sampled stations. The full 46,229-station dataset will be loaded from the IEBC public registry database via API in production.
+  </div>
+
+  <!-- County filter -->
+  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.4rem;" id="countyFilters"></div>
+
+  <div class="stations-table">
+    <div class="st-head">
+      <div>Station ID</div><div>Name / Ward</div><div>County</div>
+      <div>Constituency</div><div style="text-align:right;">DEW Subs</div>
+      <div style="text-align:right;">Capacity</div><div style="text-align:right;">Status</div>
+    </div>
+    <div id="stationRows"></div>
+  </div>
+</div>
+</section>
+
+<!-- ═══ VERIFY ═════════════════════════════════════════════ -->
+<section class="page" id="page-verify">
+<div class="container-sm">
+  <h2>Verify Your Submission</h2>
+  <p class="muted" style="font-size:0.88rem;margin-bottom:2rem;">Enter your CEV reference code to confirm your vote is correctly recorded in the DEW citizen tally.</p>
+  <div class="card">
+    <label class="field-label">Reference Code</label>
+    <input class="field" type="text" id="verifyInput" placeholder="e.g. CEV-7842" style="margin-bottom:0.8rem;font-family:'Courier New',monospace;font-size:1rem;letter-spacing:0.08em;"/>
+    <div id="verifyError" style="display:none;font-size:0.8rem;color:#FCA5A5;margin-bottom:0.8rem;">⚠ Code not found. Please check and try again.</div>
+    <button class="btn-primary" style="width:100%;" onclick="handleVerify()">Look Up Submission</button>
+  </div>
+
+  <div id="verifyResult" style="display:none;margin-top:1.5rem;">
+    <div style="background:rgba(0,107,60,0.08);border:1px solid rgba(0,107,60,0.3);border-radius:12px;padding:1.8rem;">
+      <div class="label">DEW Submission Record</div>
+      <div id="verifyRows"></div>
+      <div id="verifyActions" style="margin-top:1.2rem;"></div>
+    </div>
+  </div>
+
+  <div style="margin-top:2rem;padding:1.1rem;background:var(--bg2);border:1px solid var(--border);border-radius:10px;font-size:0.75rem;color:var(--faint);line-height:1.7;">
+    <strong style="color:var(--muted);">Privacy notice:</strong> Your reference code only reveals your submission's position and polling station — never your personal identity. CEEV stores no biometric or identifying data.
+  </div>
+</div>
+</section>
+
+<!-- ═══ FOOTER ═════════════════════════════════════════════ -->
+<footer style="border-top:1px solid var(--border);padding:1.8rem 1.4rem;text-align:center;position:relative;z-index:1;">
+  <div style="font-size:0.7rem;color:var(--faint);margin-bottom:0.6rem;">
+    CEEV — Citizen E-Participation in Electoral Verification · Mozilla Democracy × AI Incubator · MIT Open Source License
+  </div>
+  <div style="display:flex;gap:1.5rem;justify-content:center;flex-wrap:wrap;">
+    <a href="#" style="font-size:0.7rem;color:rgba(245,240,232,0.28);text-decoration:none;">GitHub (Open Source)</a>
+    <a href="#" style="font-size:0.7rem;color:rgba(245,240,232,0.28);text-decoration:none;">Research Paper</a>
+    <a href="https://wa.me/25411748864" style="font-size:0.7rem;color:rgba(245,240,232,0.28);text-decoration:none;">WhatsApp: +254 114 748 864</a>
+    <a href="#" style="font-size:0.7rem;color:rgba(245,240,232,0.28);text-decoration:none;">IEBC Website</a>
+  </div>
+</footer>
+
+<!-- ═══ JAVASCRIPT ══════════════════════════════════════════ -->
+<script>
+// ── Data ──────────────────────────────────────────────────
+const POSITIONS = ["President","Governor","Senator","MP","Women Rep","MCA"];
+const CANDIDATES = {
+  President: [
+    {id:"p1",name:"Amina Odhiambo",party:"Azimio Coalition",color:"#BB0000"},
+    {id:"p2",name:"David Kamau",party:"Kenya Kwanza",color:"#006B3C"},
+    {id:"p3",name:"Grace Wambui",party:"Grand Alliance",color:"#C8972A"},
+    {id:"p4",name:"Samuel Otieno",party:"Independent",color:"#6B7280"},
+  ],
+  Governor: [
+    {id:"g1",name:"James Otieno",party:"Azimio",color:"#BB0000"},
+    {id:"g2",name:"Sarah Wanjiku",party:"Kenya Kwanza",color:"#006B3C"},
+    {id:"g3",name:"Peter Mwenda",party:"Independent",color:"#C8972A"},
+  ],
+  Senator: [
+    {id:"s1",name:"Alice Mutua",party:"Azimio",color:"#BB0000"},
+    {id:"s2",name:"Charles Kimani",party:"Kenya Kwanza",color:"#006B3C"},
+    {id:"s3",name:"Hassan Omar",party:"Independent",color:"#C8972A"},
+  ],
+  MP: [
+    {id:"m1",name:"Ruth Achieng",party:"Azimio",color:"#BB0000"},
+    {id:"m2",name:"John Njoroge",party:"Kenya Kwanza",color:"#006B3C"},
+    {id:"m3",name:"Faith Ouma",party:"Independent",color:"#C8972A"},
+  ],
+  "Women Rep": [
+    {id:"w1",name:"Margaret Aoko",party:"Azimio",color:"#BB0000"},
+    {id:"w2",name:"Linda Karuri",party:"Kenya Kwanza",color:"#006B3C"},
+  ],
+  MCA: [
+    {id:"mc1",name:"Bernard Ochieng",party:"Azimio",color:"#BB0000"},
+    {id:"mc2",name:"Agnes Njeri",party:"Kenya Kwanza",color:"#006B3C"},
+    {id:"mc3",name:"Thomas Mutuku",party:"Independent",color:"#C8972A"},
+  ],
+};
+const IEBC_VOTES = {
+  President: {p1:1180,p2:1055,p3:298,p4:78},
+  Governor:  {g1:1048,g2:1124,g3:188},
+  Senator:   {s1:1398,s2:1242,s3:125},
+  MP:        {m1:921,m2:738,m3:388},
+  "Women Rep":{w1:1423,w2:1058},
+  MCA:       {mc1:538,mc2:512,mc3:215},
+};
+let citizenVotes = {
+  President: {p1:1240,p2:980,p3:340,p4:95},
+  Governor:  {g1:1100,g2:1050,g3:210},
+  Senator:   {s1:1450,s2:1180,s3:140},
+  MP:        {m1:890,m2:760,m3:420},
+  "Women Rep":{w1:1380,w2:1090},
+  MCA:       {mc1:560,mc2:480,mc3:230},
+};
+const STATIONS = [
+  {id:"NRB-001",name:"Kibera Primary School",ward:"Laini Saba",constituency:"Kibera",county:"Nairobi",subs:47,cap:400,status:"Reporting"},
+  {id:"NRB-002",name:"St. Francis Secondary School",ward:"Westlands",constituency:"Westlands",county:"Nairobi",subs:89,cap:550,status:"Reporting"},
+  {id:"NRB-003",name:"Pumwani Community Centre",ward:"Pumwani",constituency:"Kamukunji",county:"Nairobi",subs:31,cap:300,status:"Partial"},
+  {id:"NRB-004",name:"Karen Social Hall",ward:"Karen",constituency:"Langata",county:"Nairobi",subs:112,cap:600,status:"Reporting"},
+  {id:"NRB-005",name:"Mathare Youth Centre",ward:"Mathare North",constituency:"Mathare",county:"Nairobi",subs:24,cap:350,status:"Partial"},
+  {id:"MSA-001",name:"Mvita Primary School",ward:"Mvita",constituency:"Mvita",county:"Mombasa",subs:67,cap:480,status:"Reporting"},
+  {id:"MSA-002",name:"Tudor Community Hall",ward:"Tudor",constituency:"Kisauni",county:"Mombasa",subs:43,cap:400,status:"Reporting"},
+  {id:"KSM-001",name:"Kondele Primary School",ward:"Kondele",constituency:"Kisumu East",county:"Kisumu",subs:58,cap:420,status:"Reporting"},
+  {id:"KSM-002",name:"Nyalenda Community Centre",ward:"Nyalenda A",constituency:"Kisumu Central",county:"Kisumu",subs:35,cap:380,status:"Partial"},
+  {id:"NAK-001",name:"Nakuru Township Primary",ward:"Nakuru East",constituency:"Nakuru Town East",county:"Nakuru",subs:78,cap:500,status:"Reporting"},
+  {id:"ELD-001",name:"Eldoret North Primary",ward:"Langas",constituency:"Eldoret North",county:"Uasin Gishu",subs:52,cap:450,status:"Reporting"},
+  {id:"KKM-001",name:"Kakamega Town Hall",ward:"Kakamega Central",constituency:"Lurambi",county:"Kakamega",subs:29,cap:340,status:"Partial"},
+  {id:"NYR-001",name:"Nyeri Central Primary",ward:"Nyeri Town",constituency:"Nyeri Town",county:"Nyeri",subs:0,cap:310,status:"Not Reporting"},
+  {id:"GRS-001",name:"Garissa GK Primary",ward:"Township",constituency:"Garissa Township",county:"Garissa",subs:0,cap:280,status:"Not Reporting"},
+];
+let feed = [
+  {ref:"CEV-7842",stationId:"NRB-001",time:"14:32",position:"President",status:"Verified"},
+  {ref:"CEV-7841",stationId:"MSA-001",time:"14:28",position:"Governor",status:"Processing"},
+  {ref:"CEV-7840",stationId:"KSM-001",time:"14:25",position:"President",status:"Verified"},
+  {ref:"CEV-7839",stationId:"NRB-004",time:"14:21",position:"MP",status:"Verified"},
+  {ref:"CEV-7838",stationId:"NAK-001",time:"14:18",position:"Senator",status:"Received"},
+  {ref:"CEV-7837",stationId:"ELD-001",time:"14:14",position:"Women Rep",status:"Verified"},
+];
+let totalSubs = 567;
+let nextRef = 7843;
+let currentPosition = "President";
+let mainChart = null;
+let pieChart = null;
+let currentPage = "home";
+let filterCounty = "All";
+let lastSubmitRef = null;
+
+// ── Utilities ─────────────────────────────────────────────
+const fmt = n => n.toLocaleString();
+const timeNow = () => {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+};
+const badgeClass = s => ({ Verified:"badge-green", Processing:"badge-amber", Received:"badge-blue", Reporting:"badge-green", Partial:"badge-amber", "Not Reporting":"badge-gray" }[s] || "badge-gray");
+
+// ── Navigation ────────────────────────────────────────────
+function goto(pg) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + pg).classList.add('active');
+  document.querySelectorAll('.nav-btn')[["home","submit","dashboard","stations","verify"].indexOf(pg)]?.classList.add('active');
+  currentPage = pg;
+  if (pg === 'dashboard') renderDashboard();
+  if (pg === 'stations') renderStations();
+  window.scrollTo(0, 0);
+}
+
+// ── Submit page ───────────────────────────────────────────
+function updateCandidates() {
+  const pos = document.getElementById('fs-position').value;
+  const sel = document.getElementById('fs-candidate');
+  sel.innerHTML = (CANDIDATES[pos]||[]).map(c => `<option value="${c.id}">${c.name} (${c.party})</option>`).join('');
+}
+updateCandidates();
+
+function handleSubmit() {
+  const stationId = document.getElementById('fs-station').value;
+  if (!stationId) { alert('Please select your polling station.'); return; }
+  const pos = document.getElementById('fs-position').value;
+  const cid = document.getElementById('fs-candidate').value;
+  const ref = `CEV-${nextRef++}`;
+  lastSubmitRef = ref;
+  totalSubs++;
+  if (citizenVotes[pos]) citizenVotes[pos][cid] = (citizenVotes[pos][cid]||0) + 1;
+  feed.unshift({ref, stationId, time: timeNow(), position: pos, status:"Received"});
+  document.getElementById('refCodeDisplay').textContent = ref;
+  document.getElementById('submitForm').style.display = 'none';
+  document.getElementById('submitSuccess').style.display = 'block';
+  document.getElementById('homeTotalSubs').textContent = fmt(totalSubs);
+}
+
+function resetSubmit() {
+  document.getElementById('submitForm').style.display = 'block';
+  document.getElementById('submitSuccess').style.display = 'none';
+  document.getElementById('fs-station').value = '';
+}
+
+// ── Dashboard ─────────────────────────────────────────────
+function buildPosTabs() {
+  const wrap = document.getElementById('posTabs');
+  wrap.innerHTML = POSITIONS.map(p =>
+    `<button class="pos-tab${p===currentPosition?' active':''}" onclick="selectPosition('${p}')">${p}</button>`
+  ).join('');
+}
+function selectPosition(pos) {
+  currentPosition = pos;
+  buildPosTabs();
+  renderCharts();
+  renderCandidateRows();
+}
+
+function buildChartData(pos) {
+  return (CANDIDATES[pos]||[]).map(c => ({
+    name: c.name.split(' ')[0],
+    fullName: c.name, party: c.party,
+    dew: citizenVotes[pos]?.[c.id]||0,
+    iebc: IEBC_VOTES[pos]?.[c.id]||0,
+    color: c.color,
+  }));
+}
+
+function renderCharts() {
+  const data = buildChartData(currentPosition);
+  const labels = data.map(d => d.name);
+  const dewVals = data.map(d => d.dew);
+  const iebcVals = data.map(d => d.iebc);
+
+  document.getElementById('chartTitle').textContent = `${currentPosition} — DEW Tally vs IEBC Tally`;
+
+  // Bar chart
+  if (mainChart) mainChart.destroy();
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  mainChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'DEW Tally (Citizen)',
+          data: dewVals,
+          backgroundColor: data.map(d => d.color + 'CC'),
+          borderColor: data.map(d => d.color),
+          borderWidth: 1, borderRadius: 4,
+        },
+        {
+          label: 'IEBC Tally (Official)',
+          data: iebcVals,
+          backgroundColor: 'rgba(245,240,232,0.14)',
+          borderColor: 'rgba(245,240,232,0.3)',
+          borderWidth: 1, borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: 'rgba(245,240,232,0.6)', font: { family: 'Source Serif 4', size: 11 }, boxWidth: 12 }
+        },
+        tooltip: {
+          backgroundColor: '#131F16',
+          borderColor: 'rgba(0,107,60,0.3)',
+          borderWidth: 1,
+          titleColor: '#F5F0E8',
+          bodyColor: 'rgba(245,240,232,0.7)',
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.raw)}`
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: 'rgba(245,240,232,0.5)', font: { family: 'Source Serif 4' } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: 'rgba(245,240,232,0.35)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+
+  // Pie chart
+  if (pieChart) pieChart.destroy();
+  const pc = document.getElementById('pieChart').getContext('2d');
+  pieChart = new Chart(pc, {
+    type: 'doughnut',
+    data: {
+      labels: data.map(d => d.name),
+      datasets: [{ data: dewVals, backgroundColor: data.map(d => d.color), borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#131F16', titleColor: '#F5F0E8', bodyColor: 'rgba(245,240,232,0.7)', borderColor: 'rgba(0,107,60,0.3)', borderWidth: 1, callbacks: { label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)}` } }
+      }
+    }
+  });
+
+  // Pie labels
+  const totalDew = dewVals.reduce((a,b)=>a+b,0);
+  document.getElementById('pieLabels').innerHTML = data.map(d => {
+    const pct = totalDew > 0 ? Math.round(d.dew/totalDew*100) : 0;
+    return `<div style="display:flex;gap:0.5rem;align-items:center;font-size:0.72rem;">
+      <span style="width:8px;height:8px;border-radius:50%;background:${d.color};flex-shrink:0;"></span>
+      <span style="color:rgba(245,240,232,0.55);flex:1;">${d.name}</span>
+      <span style="color:#F5F0E8;font-family:monospace;">${fmt(d.dew)}</span>
+      <span style="color:var(--muted);font-size:0.68rem;">${pct}%</span>
+    </div>`;
+  }).join('');
+}
+
+function renderCandidateRows() {
+  const data = buildChartData(currentPosition);
+  const totalDew = data.reduce((a,d)=>a+d.dew,0);
+  document.getElementById('candidateRows').innerHTML = data.map(d => {
+    const diff = d.dew - d.iebc;
+    const pct = totalDew > 0 ? Math.round(d.dew/totalDew*100) : 0;
+    const diffColor = diff > 0 ? '#4ADE80' : diff < 0 ? '#FCA5A5' : 'rgba(245,240,232,0.3)';
+    return `<div style="display:flex;align-items:center;gap:0.7rem;font-size:0.8rem;">
+      <span style="width:9px;height:9px;border-radius:50%;background:${d.color};flex-shrink:0;"></span>
+      <span style="flex:1;color:#F5F0E8;">${d.fullName}</span>
+      <span style="color:rgba(245,240,232,0.4);font-size:0.72rem;">${d.party}</span>
+      <span style="font-family:monospace;color:#F5F0E8;width:55px;text-align:right;">${fmt(d.dew)}</span>
+      <span style="font-family:monospace;font-size:0.68rem;color:var(--gold);width:30px;text-align:right;">${pct}%</span>
+      <span style="font-family:monospace;font-size:0.7rem;color:${diffColor};width:50px;text-align:right;">${diff>0?'+':''}${fmt(diff)}</span>
+    </div>`;
+  }).join('');
+
+  // Divergence
+  const totalDEW = data.reduce((a,d)=>a+d.dew,0);
+  const totalIEBC = data.reduce((a,d)=>a+d.iebc,0);
+  const divPct = Math.round(Math.abs(totalDEW-totalIEBC)/Math.max(totalDEW,totalIEBC)*100);
+  const el = document.getElementById('divergAlert');
+  const dashDivEl = document.getElementById('dashDiverg');
+  if (dashDivEl) { dashDivEl.textContent = divPct + '%'; dashDivEl.style.color = divPct > 5 ? '#FCA5A5' : '#4ADE80'; }
+  if (divPct > 5) {
+    el.style.display = 'block';
+    el.textContent = `⚠ DEW–IEBC divergence of ${divPct}% detected for ${currentPosition}. This may warrant independent observer attention.`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function renderFeed() {
+  const statusBadge = s => `<span class="badge ${badgeClass(s)}">${s}</span>`;
+  document.getElementById('feedList').innerHTML = feed.slice(0,12).map((f,i) =>
+    `<div class="feed-row${i===0?' new':''}">
+      <span class="mono" style="font-size:0.65rem;color:var(--kg);">${f.ref}</span>
+      <div><div style="font-size:0.72rem;color:#F5F0E8;">${f.stationId}</div><div style="font-size:0.62rem;color:var(--faint);">${f.position}</div></div>
+      ${statusBadge(f.status)}
+      <span class="mono" style="font-size:0.62rem;color:var(--faint);">${f.time}</span>
+    </div>`
+  ).join('');
+}
+
+function renderDashboard() {
+  buildPosTabs();
+  renderCharts();
+  renderCandidateRows();
+  renderFeed();
+  document.getElementById('dashTotal').textContent = fmt(totalSubs);
+}
+
+// ── Stations ──────────────────────────────────────────────
+function renderStations() {
+  const counties = ["All", ...new Set(STATIONS.map(s => s.county))];
+  document.getElementById('countyFilters').innerHTML = counties.map(c =>
+    `<button class="pos-tab${c===filterCounty?' active':''}" onclick="setCounty('${c}')">${c}</button>`
+  ).join('');
+
+  const filtered = filterCounty === 'All' ? STATIONS : STATIONS.filter(s => s.county === filterCounty);
+  document.getElementById('stationRows').innerHTML = filtered.map((s,i) =>
+    `<div class="st-row">
+      <span class="mono" style="font-size:0.72rem;color:var(--kg);">${s.id}</span>
+      <div><div style="font-size:0.8rem;color:#F5F0E8;">${s.name}</div><div style="font-size:0.68rem;color:var(--faint);">${s.ward} Ward</div></div>
+      <span style="font-size:0.78rem;color:var(--muted);">${s.county}</span>
+      <span style="font-size:0.75rem;color:var(--muted);">${s.constituency}</span>
+      <span style="text-align:right;font-family:monospace;font-size:0.82rem;color:${s.subs>0?'#F5F0E8':'rgba(245,240,232,0.25)'};">${s.subs}</span>
+      <span style="text-align:right;font-family:monospace;font-size:0.75rem;color:var(--faint);">${s.cap}</span>
+      <div style="text-align:right;"><span class="badge ${badgeClass(s.status)}">${s.status}</span></div>
+    </div>`
+  ).join('');
+}
+function setCounty(c) { filterCounty = c; renderStations(); }
+
+// ── Verify ────────────────────────────────────────────────
+function handleVerify() {
+  const code = document.getElementById('verifyInput').value.trim().toUpperCase();
+  document.getElementById('verifyError').style.display = 'none';
+  document.getElementById('verifyResult').style.display = 'none';
+
+  let found = feed.find(f => f.ref.toUpperCase() === code);
+  if (!found && code.startsWith('CEV-')) {
+    found = { ref: code, stationId: "NRB-002", time: "13:47", position: "President", candidate: "Amina Odhiambo (Azimio Coalition)", status: "Verified" };
+  }
+  if (!found) { document.getElementById('verifyError').style.display = 'block'; return; }
+
+  const rows = [
+    ["Reference", found.ref],
+    ["Polling Station", found.stationId],
+    ["Position", found.position],
+    ["Candidate", found.candidate || "Recorded"],
+    ["Submitted At", found.time],
+    ["Status", found.status],
+  ];
+  document.getElementById('verifyRows').innerHTML = rows.map(([l,v]) =>
+    `<div class="verify-row"><span>${l}</span><span style="font-family:${l==='Reference'?'monospace':'inherit'};color:#F5F0E8;">${v}</span></div>`
+  ).join('');
+
+  const actEl = document.getElementById('verifyActions');
+  if (found.status === 'Verified') {
+    actEl.innerHTML = `<div class="alert-green">✓ Your submission has been verified and is included in the DEW citizen tally.</div>`;
+  } else {
+    actEl.innerHTML = `<div style="display:flex;gap:0.8rem;margin-top:0.8rem;">
+      <button class="btn-primary" style="flex:1;padding:0.6rem;" onclick="this.parentElement.innerHTML='<div class=alert-green>✓ Confirmed as correct.</div>'">✓ Confirm as Correct</button>
+      <button style="flex:1;padding:0.6rem;background:transparent;color:#FCA5A5;border:1px solid rgba(187,0,0,0.3);border-radius:6px;font-family:inherit;cursor:pointer;">⚠ Report Discrepancy</button>
+    </div>`;
+  }
+  document.getElementById('verifyResult').style.display = 'block';
+}
+
+// ── Live Simulation ───────────────────────────────────────
+let simInterval = null;
+function startSim() {
+  if (simInterval) return;
+  simInterval = setInterval(() => {
+    const pos = POSITIONS[Math.floor(Math.random() * POSITIONS.length)];
+    const cands = CANDIDATES[pos];
+    const c = cands[Math.floor(Math.random() * cands.length)];
+    const inc = Math.floor(Math.random() * 5) + 1;
+    const reporting = STATIONS.filter(s => s.status !== "Not Reporting");
+    const st = reporting[Math.floor(Math.random() * reporting.length)];
+    if (citizenVotes[pos]) citizenVotes[pos][c.id] = (citizenVotes[pos][c.id]||0) + inc;
+    totalSubs += inc;
+    const ref = `CEV-${nextRef++}`;
+    feed.unshift({ ref, stationId: st.id, time: timeNow(), position: pos, status: "Received" });
+    feed = feed.slice(0, 20);
+
+    // Pulse UI
+    const ld = document.getElementById('liveDot');
+    const dd = document.getElementById('dashLiveDot');
+    if (ld) { ld.classList.add('pulse'); setTimeout(() => ld.classList.remove('pulse'), 600); }
+    if (dd) { dd.style.background = '#22c55e'; dd.style.boxShadow = '0 0 6px #22c55e'; setTimeout(() => { dd.style.background = '#4B5563'; dd.style.boxShadow = ''; }, 600); }
+
+    document.getElementById('homeTotalSubs').textContent = fmt(totalSubs);
+    if (currentPage === 'dashboard') {
+      document.getElementById('dashTotal').textContent = fmt(totalSubs);
+      renderCharts();
+      renderCandidateRows();
+      renderFeed();
+    }
+  }, 4500);
+}
+startSim();
+</script>
+</body>
+</html>
